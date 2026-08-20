@@ -508,9 +508,13 @@ function diasDesde(iso) {
 
 function estaAtrasado(p) {
   if (p.arquivado) return false;
-  if (p.pagamento === 'boleto' && p.vencimento && !p.lancado) {
+  if (!p.lancado) {
     const hoje = new Date().toISOString().slice(0, 10);
-    if (p.vencimento < hoje) return true;
+    if (p.pagamento === 'boleto' && p.vencimento) {
+      if (p.vencimento < hoje) return true;
+      const quartaIdeal = quartaFeiraAnteriorOuIgual(somarDias(p.vencimento, -15));
+      if (quartaIdeal < hoje) return true;
+    }
   }
   return diasDesde(p.statusDesde) >= 3;
 }
@@ -524,6 +528,33 @@ function formatarData(iso) {
 function formatarDataHora(iso) {
   const d = new Date(iso);
   return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+// Retorna a quarta-feira mais próxima igual ou anterior a uma data (YYYY-MM-DD)
+function quartaFeiraAnteriorOuIgual(dataISO) {
+  const d = new Date(dataISO + 'T12:00:00');
+  const diaSemana = d.getDay(); // 0=dom, 3=qua
+  let diff;
+  if (diaSemana >= 3) diff = diaSemana - 3;
+  else diff = diaSemana + 4;
+  d.setDate(d.getDate() - diff);
+  return d.toISOString().slice(0, 10);
+}
+
+// Retorna a próxima quarta-feira igual ou posterior a hoje
+function proximaQuartaFeira() {
+  const hoje = new Date();
+  const diaSemana = hoje.getDay();
+  let diff = (3 - diaSemana + 7) % 7;
+  const d = new Date(hoje);
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
+function somarDias(dataISO, dias) {
+  const d = new Date(dataISO + 'T12:00:00');
+  d.setDate(d.getDate() + dias);
+  return d.toISOString().slice(0, 10);
 }
 
 // ===== MODAL DE ITENS =====
@@ -832,6 +863,22 @@ function render() {
       }
     }
 
+    let lancamentoHTML = '';
+    if (!p.lancado) {
+      if (p.pagamento === 'boleto' && p.vencimento) {
+        const quartaIdeal = quartaFeiraAnteriorOuIgual(somarDias(p.vencimento, -15));
+        const prazoPerdido = quartaIdeal < hoje;
+        if (prazoPerdido) {
+          lancamentoHTML = `<div class="card-meta" style="margin-top:6px;"><span class="badge venc-tag">Prazo de lançamento vencido (era ${formatarData(quartaIdeal)}) — lance com urgência</span></div>`;
+        } else {
+          lancamentoHTML = `<div class="previsao">Lançar na quarta-feira: ${formatarData(quartaIdeal)}</div>`;
+        }
+      } else if (p.pagamento === 'pix') {
+        const quarta = proximaQuartaFeira();
+        lancamentoHTML = `<div class="previsao">Lançar na quarta-feira: ${formatarData(quarta)}</div>`;
+      }
+    }
+
     let nfRow = '';
     if (p.status === 'nf') {
       nfRow = `
@@ -875,6 +922,7 @@ function render() {
             ${previsaoHTML}
             ${infoPagtoHTML}
             ${vencimentoAlertaHTML}
+            ${lancamentoHTML}
           </div>
           <span class="badge ${st.cls}">${st.label}</span>
         </div>
