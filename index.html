@@ -6,24 +6,26 @@
 <title>Rastreador de Pedidos - EPM</title>
 <style>
   :root {
-    --bg: #f5f4f0;
-    --card: #ffffff;
-    --border: #ddd9cf;
-    --text: #2c2b28;
-    --text-muted: #8a877d;
-    --amber-bg: #fdf1de;
-    --amber-text: #8a5a0c;
-    --amber-border: #f0c98a;
-    --blue-bg: #e6f1fb;
-    --blue-text: #0c447c;
-    --blue-border: #a9cdf0;
-    --green-bg: #eaf3de;
-    --green-text: #27500a;
-    --green-border: #b7d98a;
-    --red-bg: #fcebeb;
-    --red-text: #791f1f;
-    --red-border: #eeb4b4;
-    --accent: #b5602e;
+    --bg: #0d0d0d;
+    --card: #1a1a1a;
+    --card-hover: #212121;
+    --border: #2c2c2c;
+    --text: #e8e6e2;
+    --text-muted: #8f8c86;
+    --amber-bg: #2a2110;
+    --amber-text: #e0a83c;
+    --amber-border: #4a3a16;
+    --blue-bg: #101d2a;
+    --blue-text: #5b9bd9;
+    --blue-border: #1c3550;
+    --green-bg: #10240f;
+    --green-text: #6fc25a;
+    --green-border: #1e3d1a;
+    --red-bg: #2a1212;
+    --red-text: #f16d6d;
+    --red-border: #4a1c1c;
+    --accent: #dc2626;
+    --accent-hover: #b91c1c;
   }
   * { box-sizing: border-box; }
   body {
@@ -40,6 +42,7 @@
     font-size: 20px;
     font-weight: 600;
     margin: 8px 0 4px;
+    letter-spacing: -0.01em;
   }
   .subtitle {
     color: var(--text-muted);
@@ -75,7 +78,11 @@
     border: 1px solid var(--border);
     font-size: 14px;
     background: var(--card);
+    color: var(--text);
   }
+  .toolbar input[type=text]::placeholder { color: var(--text-muted); }
+  .toolbar input[type=text]:focus { outline: none; border-color: var(--accent); }
+
   button {
     cursor: pointer;
     border: none;
@@ -90,7 +97,7 @@
     font-weight: 600;
     white-space: nowrap;
   }
-  .btn-primary:active { opacity: 0.85; }
+  .btn-primary:active { background: var(--accent-hover); }
 
   .filters {
     display: flex;
@@ -110,7 +117,7 @@
   }
   .chip.active {
     background: var(--text);
-    color: white;
+    color: var(--bg);
     border-color: var(--text);
   }
 
@@ -122,15 +129,21 @@
     margin-bottom: 10px;
     position: relative;
   }
-  .card.late { border-color: var(--red-border); background: var(--red-bg); }
+  .card.late { border-color: var(--red-border); background: linear-gradient(180deg, rgba(220,38,38,0.06), rgba(220,38,38,0) 40%), var(--card); }
   .card-top {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     gap: 8px;
   }
-  .card-item { font-size: 15px; font-weight: 600; margin: 0 0 2px; }
-  .card-supplier { font-size: 13px; color: var(--text-muted); margin: 0; }
+  .card-supplier { font-size: 15px; font-weight: 600; margin: 0 0 6px; }
+  .card-itens { margin: 0 0 4px; }
+  .card-item-line {
+    font-size: 13px;
+    color: var(--text);
+    padding: 2px 0;
+  }
+  .card-item-line .qtd { color: var(--text-muted); margin-right: 4px; }
   .badge {
     font-size: 11px;
     font-weight: 600;
@@ -149,12 +162,18 @@
   .card-meta {
     font-size: 12px;
     color: var(--text-muted);
-    margin-top: 8px;
+    margin-top: 10px;
     display: flex;
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 4px;
   }
+  .previsao {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+  .previsao.venceu { color: var(--red-text); }
 
   .nf-row {
     margin-top: 10px;
@@ -172,6 +191,8 @@
     border-radius: 6px;
     border: 1px solid var(--border);
     font-size: 13px;
+    background: var(--bg);
+    color: var(--text);
   }
   .toggle-lancado {
     font-size: 12px;
@@ -179,7 +200,7 @@
     padding: 6px 10px;
     border-radius: 6px;
     border: 1px solid var(--border);
-    background: #fff;
+    background: var(--bg);
     color: var(--text-muted);
   }
   .toggle-lancado.on {
@@ -199,10 +220,11 @@
     padding: 7px 12px;
     border-radius: 6px;
     border: 1px solid var(--border);
-    background: #fff;
+    background: var(--bg);
     color: var(--text);
   }
   .actions button.danger { color: var(--red-text); border-color: var(--red-border); }
+  .actions button.primary-ghost { color: var(--accent); border-color: var(--red-border); }
 
   .empty {
     text-align: center;
@@ -214,7 +236,7 @@
   .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.4);
+    background: rgba(0,0,0,0.6);
     display: none;
     align-items: flex-end;
     justify-content: center;
@@ -227,8 +249,10 @@
     max-width: 480px;
     border-radius: 16px 16px 0 0;
     padding: 20px;
-    max-height: 85vh;
+    max-height: 88vh;
     overflow-y: auto;
+    border: 1px solid var(--border);
+    border-bottom: none;
   }
   .modal h2 { font-size: 16px; margin: 0 0 14px; }
   .field { margin-bottom: 12px; }
@@ -246,16 +270,71 @@
     border: 1px solid var(--border);
     font-size: 14px;
     font-family: inherit;
+    background: var(--bg);
+    color: var(--text);
   }
+  .field input:focus { outline: none; border-color: var(--accent); }
+
+  .itens-lista { margin-bottom: 10px; }
+  .item-row {
+    display: grid;
+    grid-template-columns: 60px 90px 1fr auto;
+    gap: 6px;
+    margin-bottom: 8px;
+    align-items: center;
+  }
+  .item-row input {
+    padding: 8px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    width: 100%;
+  }
+  .item-row input:focus { outline: none; border-color: var(--accent); }
+  .item-remove {
+    background: var(--red-bg);
+    color: var(--red-text);
+    border: 1px solid var(--red-border);
+    border-radius: 6px;
+    width: 30px;
+    height: 30px;
+    font-size: 16px;
+    line-height: 1;
+  }
+  .btn-add-item {
+    background: var(--bg);
+    border: 1px dashed var(--border);
+    color: var(--text-muted);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    width: 100%;
+    margin-bottom: 12px;
+  }
+
   .modal-actions {
     display: flex;
     gap: 8px;
     margin-top: 16px;
   }
   .modal-actions button { flex: 1; padding: 12px; border-radius: 8px; font-size: 14px; font-weight: 600; }
-  .btn-cancel { background: #fff; border: 1px solid var(--border); color: var(--text); }
+  .btn-cancel { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
 
   .err { color: var(--red-text); font-size: 12px; margin-top: 4px; display: none; }
+
+  .hist-list { margin-top: 6px; }
+  .hist-line {
+    font-size: 13px;
+    color: var(--text-muted);
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+  }
+  .hist-line:last-child { border-bottom: none; }
+  .hist-line .status-nome { color: var(--text); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -276,26 +355,43 @@
 
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
-    <h2>Novo pedido</h2>
+    <h2 id="modalTitulo">Novo pedido</h2>
     <div class="field">
       <label>Fornecedor</label>
       <input type="text" id="f-fornecedor" placeholder="Ex: Fornecedor A">
     </div>
+
     <div class="field">
-      <label>Item / descrição do pedido</label>
-      <input type="text" id="f-item" placeholder="Ex: 50 sacos de cimento">
+      <label>Itens do pedido</label>
+      <div class="itens-lista" id="itensLista"></div>
+      <button type="button" class="btn-add-item" onclick="adicionarLinhaItem()">+ Adicionar item</button>
     </div>
-    <div class="err" id="f-err">Preencha fornecedor e item.</div>
+
+    <div class="field">
+      <label>Previsão de entrega (opcional)</label>
+      <input type="date" id="f-previsao">
+    </div>
+
+    <div class="err" id="f-err">Preencha fornecedor e pelo menos um item.</div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
-      <button class="btn-primary" onclick="salvarPedido()" style="flex:1;">Salvar pedido</button>
+      <button class="btn-primary" id="btnSalvarModal" onclick="salvarPedido()" style="flex:1;">Salvar pedido</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="histOverlay">
+  <div class="modal">
+    <h2>Histórico do pedido</h2>
+    <div class="hist-list" id="histLista"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeHist()" style="flex:1;">Fechar</button>
     </div>
   </div>
 </div>
 
 <script type="module">
 // ===== CONFIGURACAO DO FIREBASE =====
-// Cole aqui as credenciais do SEU projeto Firebase (veja instrucoes enviadas).
 const firebaseConfig = {
   apiKey: "AIzaSyA8-yk9emSNXNsKMgDNIsxeUUv9pghhPMg",
   authDomain: "epm-pedidos.firebaseapp.com",
@@ -317,6 +413,8 @@ const pedidosCol = collection(db, "pedidos-epm");
 
 let pedidos = [];
 let filtroAtual = 'ativos';
+let editandoId = null;
+let itemCounter = 0;
 
 const STATUS = {
   pedido: { label: 'Pedido feito', cls: 'pedido' },
@@ -330,7 +428,7 @@ onSnapshot(pedidosCol, (snapshot) => {
 }, (err) => {
   console.error('Erro ao sincronizar', err);
   document.getElementById('list').innerHTML =
-    '<div class="empty">Nao foi possivel conectar ao banco de dados. Confira a configuracao do Firebase.</div>';
+    '<div class="empty">Não foi possível conectar ao banco de dados. Confira a configuração do Firebase.</div>';
 });
 
 async function salvarNoFirestore(p) {
@@ -351,8 +449,7 @@ async function excluirDoFirestore(id) {
 }
 
 function diasDesde(iso) {
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-  return d;
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
 }
 
 function estaAtrasado(p) {
@@ -360,36 +457,139 @@ function estaAtrasado(p) {
   return diasDesde(p.statusDesde) >= 3;
 }
 
-window.openModal = function() {
-  document.getElementById('f-fornecedor').value = '';
-  document.getElementById('f-item').value = '';
+function formatarData(iso) {
+  if (!iso) return '';
+  const [ano, mes, dia] = iso.split('-');
+  return `${dia}/${mes}/${ano}`;
+}
+
+function formatarDataHora(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ===== MODAL DE ITENS =====
+function linhaItemHTML(item) {
+  const uid = item.uid;
+  return `
+    <div class="item-row" data-uid="${uid}">
+      <input type="text" placeholder="Qtd" value="${item.qtd || ''}" data-campo="qtd">
+      <input type="text" placeholder="Unidade" value="${item.unidade || ''}" data-campo="unidade">
+      <input type="text" placeholder="Descrição (ex: cimento CP-II)" value="${(item.descricao || '').replace(/"/g,'&quot;')}" data-campo="descricao">
+      <button type="button" class="item-remove" onclick="removerLinhaItem('${uid}')">×</button>
+    </div>
+  `;
+}
+
+window.adicionarLinhaItem = function(item) {
+  const uid = item?.uid ?? ('it' + (itemCounter++));
+  const novoItem = { uid, qtd: item?.qtd || '', unidade: item?.unidade || '', descricao: item?.descricao || '' };
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = linhaItemHTML(novoItem);
+  document.getElementById('itensLista').appendChild(wrapper.firstElementChild);
+}
+
+window.removerLinhaItem = function(uid) {
+  const el = document.querySelector(`.item-row[data-uid="${uid}"]`);
+  if (el) el.remove();
+}
+
+function lerItensDoModal() {
+  const linhas = document.querySelectorAll('#itensLista .item-row');
+  const itens = [];
+  linhas.forEach(linha => {
+    const qtd = linha.querySelector('[data-campo=qtd]').value.trim();
+    const unidade = linha.querySelector('[data-campo=unidade]').value.trim();
+    const descricao = linha.querySelector('[data-campo=descricao]').value.trim();
+    if (descricao) itens.push({ qtd, unidade, descricao });
+  });
+  return itens;
+}
+
+// ===== MODAL PRINCIPAL =====
+window.openModal = function(id) {
+  editandoId = id || null;
+  const p = editandoId ? pedidos.find(x => x.id === editandoId) : null;
+
+  document.getElementById('f-fornecedor').value = p ? p.fornecedor : '';
+  document.getElementById('f-previsao').value = p ? (p.previsao || '') : '';
   document.getElementById('f-err').style.display = 'none';
+  document.getElementById('modalTitulo').textContent = p ? 'Editar pedido' : 'Novo pedido';
+  document.getElementById('btnSalvarModal').textContent = p ? 'Salvar alterações' : 'Salvar pedido';
+
+  document.getElementById('itensLista').innerHTML = '';
+  if (p && p.itens && p.itens.length) {
+    p.itens.forEach(it => adicionarLinhaItem(it));
+  } else {
+    adicionarLinhaItem();
+  }
+
   document.getElementById('modalOverlay').classList.add('open');
 }
 window.closeModal = function() {
   document.getElementById('modalOverlay').classList.remove('open');
+  editandoId = null;
 }
 
 window.salvarPedido = function() {
   const fornecedor = document.getElementById('f-fornecedor').value.trim();
-  const item = document.getElementById('f-item').value.trim();
-  if (!fornecedor || !item) {
+  const previsao = document.getElementById('f-previsao').value;
+  const itens = lerItensDoModal();
+
+  if (!fornecedor || itens.length === 0) {
     document.getElementById('f-err').style.display = 'block';
     return;
   }
-  const now = new Date().toISOString();
-  const novo = {
-    id: 'p' + Date.now(),
-    fornecedor, item,
-    status: 'pedido',
-    statusDesde: now,
-    criadoEm: now,
-    nf: '',
-    lancado: false,
-    arquivado: false
-  };
-  salvarNoFirestore(novo);
+
+  if (editandoId) {
+    const p = pedidos.find(x => x.id === editandoId);
+    if (p) {
+      p.fornecedor = fornecedor;
+      p.itens = itens;
+      p.previsao = previsao;
+      salvarNoFirestore(p);
+    }
+  } else {
+    const now = new Date().toISOString();
+    const novo = {
+      id: 'p' + Date.now(),
+      fornecedor,
+      itens,
+      previsao,
+      status: 'pedido',
+      statusDesde: now,
+      criadoEm: now,
+      nf: '',
+      lancado: false,
+      arquivado: false,
+      historico: [{ status: 'pedido', data: now }]
+    };
+    salvarNoFirestore(novo);
+  }
   closeModal();
+}
+
+// ===== HISTÓRICO =====
+window.abrirHistorico = function(id) {
+  const p = pedidos.find(x => x.id === id);
+  if (!p) return;
+  const hist = p.historico && p.historico.length ? p.historico : [{ status: p.status, data: p.statusDesde }];
+  document.getElementById('histLista').innerHTML = hist.map(h => `
+    <div class="hist-line">
+      <span class="status-nome">${STATUS[h.status]?.label || h.status}</span>
+      <span>${formatarDataHora(h.data)}</span>
+    </div>
+  `).join('');
+  document.getElementById('histOverlay').classList.add('open');
+}
+window.closeHist = function() {
+  document.getElementById('histOverlay').classList.remove('open');
+}
+
+// ===== AÇÕES DE STATUS =====
+function registrarHistorico(p) {
+  if (!p.historico) p.historico = [];
+  p.historico.push({ status: p.status, data: p.statusDesde });
 }
 
 window.avancarStatus = function(id) {
@@ -400,6 +600,7 @@ window.avancarStatus = function(id) {
   if (i < ordem.length - 1) {
     p.status = ordem[i + 1];
     p.statusDesde = new Date().toISOString();
+    registrarHistorico(p);
   }
   salvarNoFirestore(p);
 }
@@ -412,6 +613,7 @@ window.voltarStatus = function(id) {
   if (i > 0) {
     p.status = ordem[i - 1];
     p.statusDesde = new Date().toISOString();
+    registrarHistorico(p);
   }
   salvarNoFirestore(p);
 }
@@ -446,6 +648,7 @@ window.setFiltro = function(f) {
   render();
 }
 
+// ===== RENDER =====
 function render() {
   const total = pedidos.filter(p => !p.arquivado).length;
   const atrasados = pedidos.filter(p => estaAtrasado(p)).length;
@@ -477,9 +680,10 @@ function render() {
 
   const busca = document.getElementById('search').value.trim().toLowerCase();
   if (busca) {
-    lista = lista.filter(p =>
-      p.fornecedor.toLowerCase().includes(busca) || p.item.toLowerCase().includes(busca)
-    );
+    lista = lista.filter(p => {
+      const itensTexto = (p.itens || []).map(it => it.descricao).join(' ').toLowerCase();
+      return p.fornecedor.toLowerCase().includes(busca) || itensTexto.includes(busca);
+    });
   }
 
   lista = lista.slice().sort((a, b) => new Date(b.criadoEm) - new Date(a.criadoEm));
@@ -490,6 +694,8 @@ function render() {
     return;
   }
 
+  const hoje = new Date().toISOString().slice(0, 10);
+
   listEl.innerHTML = lista.map(p => {
     const atrasado = estaAtrasado(p);
     const dias = diasDesde(p.statusDesde);
@@ -499,11 +705,21 @@ function render() {
     const podeAvancar = idx < ordem.length - 1 && !p.arquivado;
     const podeVoltar = idx > 0 && !p.arquivado;
 
+    const itensHTML = (p.itens || []).map(it => `
+      <div class="card-item-line">${it.qtd ? `<span class="qtd">${it.qtd}${it.unidade ? ' ' + it.unidade : ''}</span>` : ''}${it.descricao}</div>
+    `).join('');
+
+    let previsaoHTML = '';
+    if (p.previsao) {
+      const venceu = p.previsao < hoje && p.status !== 'nf';
+      previsaoHTML = `<div class="previsao ${venceu ? 'venceu' : ''}">Previsão: ${formatarData(p.previsao)}${venceu ? ' (vencida)' : ''}</div>`;
+    }
+
     let nfRow = '';
     if (p.status === 'nf') {
       nfRow = `
         <div class="nf-row">
-          <input type="text" placeholder="Numero da NF" value="${(p.nf || '').replace(/"/g,'&quot;')}"
+          <input type="text" placeholder="Número da NF" value="${(p.nf || '').replace(/"/g,'&quot;')}"
             onchange="atualizarNF('${p.id}', this.value)">
           <button class="toggle-lancado ${p.lancado ? 'on' : ''}" onclick="toggleLancado('${p.id}')">
             ${p.lancado ? 'Lançado no sistema' : 'Pendente lançamento'}
@@ -512,24 +728,34 @@ function render() {
       `;
     }
 
+    const btnEditar = `<button onclick="openModal('${p.id}')">Editar</button>`;
+    const btnHist = `<button onclick="abrirHistorico('${p.id}')">Histórico</button>`;
+
     let actions = '';
     if (!p.arquivado) {
       actions = `<div class="actions">
+        ${btnEditar}
+        ${btnHist}
         ${podeVoltar ? `<button onclick="voltarStatus('${p.id}')">Voltar etapa</button>` : ''}
-        ${podeAvancar ? `<button onclick="avancarStatus('${p.id}')">Avançar etapa</button>` : ''}
+        ${podeAvancar ? `<button class="primary-ghost" onclick="avancarStatus('${p.id}')">Avançar etapa</button>` : ''}
         ${p.status === 'nf' ? `<button onclick="arquivar('${p.id}')">Arquivar</button>` : ''}
         <button class="danger" onclick="excluir('${p.id}')">Excluir</button>
       </div>`;
     } else {
-      actions = `<div class="actions"><button class="danger" onclick="excluir('${p.id}')">Excluir</button></div>`;
+      actions = `<div class="actions">
+        ${btnEditar}
+        ${btnHist}
+        <button class="danger" onclick="excluir('${p.id}')">Excluir</button>
+      </div>`;
     }
 
     return `
       <div class="card ${atrasado ? 'late' : ''}">
         <div class="card-top">
           <div>
-            <p class="card-item">${p.item}</p>
             <p class="card-supplier">${p.fornecedor}</p>
+            <div class="card-itens">${itensHTML}</div>
+            ${previsaoHTML}
           </div>
           <span class="badge ${st.cls}">${st.label}</span>
         </div>
