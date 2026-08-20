@@ -293,10 +293,30 @@
   </div>
 </div>
 
-<script>
+<script type="module">
+// ===== CONFIGURACAO DO FIREBASE =====
+// Cole aqui as credenciais do SEU projeto Firebase (veja instrucoes enviadas).
+const firebaseConfig = {
+  apiKey: "AIzaSyA8-yk9emSNXNsKMgDNIsxeUUv9pghhPMg",
+  authDomain: "epm-pedidos.firebaseapp.com",
+  projectId: "epm-pedidos",
+  storageBucket: "epm-pedidos.firebasestorage.app",
+  messagingSenderId: "809353955527",
+  appId: "1:809353955527:web:09d35b99c5a6322e83d6e2"
+};
+// =====================================
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const pedidosCol = collection(db, "pedidos-epm");
+
 let pedidos = [];
 let filtroAtual = 'ativos';
-let buscaAtual = '';
 
 const STATUS = {
   pedido: { label: 'Pedido feito', cls: 'pedido' },
@@ -304,21 +324,29 @@ const STATUS = {
   nf: { label: 'NF recebida', cls: 'nf' }
 };
 
-function carregar() {
-  try {
-    const raw = localStorage.getItem('pedidos-epm');
-    pedidos = raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    pedidos = [];
-  }
+onSnapshot(pedidosCol, (snapshot) => {
+  pedidos = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
   render();
-}
+}, (err) => {
+  console.error('Erro ao sincronizar', err);
+  document.getElementById('list').innerHTML =
+    '<div class="empty">Nao foi possivel conectar ao banco de dados. Confira a configuracao do Firebase.</div>';
+});
 
-function salvar() {
+async function salvarNoFirestore(p) {
   try {
-    localStorage.setItem('pedidos-epm', JSON.stringify(pedidos));
+    const { id, ...dados } = p;
+    await setDoc(doc(db, "pedidos-epm", id), dados);
   } catch (e) {
     console.error('Erro ao salvar', e);
+  }
+}
+
+async function excluirDoFirestore(id) {
+  try {
+    await deleteDoc(doc(db, "pedidos-epm", id));
+  } catch (e) {
+    console.error('Erro ao excluir', e);
   }
 }
 
@@ -332,17 +360,17 @@ function estaAtrasado(p) {
   return diasDesde(p.statusDesde) >= 3;
 }
 
-function openModal() {
+window.openModal = function() {
   document.getElementById('f-fornecedor').value = '';
   document.getElementById('f-item').value = '';
   document.getElementById('f-err').style.display = 'none';
   document.getElementById('modalOverlay').classList.add('open');
 }
-function closeModal() {
+window.closeModal = function() {
   document.getElementById('modalOverlay').classList.remove('open');
 }
 
-function salvarPedido() {
+window.salvarPedido = function() {
   const fornecedor = document.getElementById('f-fornecedor').value.trim();
   const item = document.getElementById('f-item').value.trim();
   if (!fornecedor || !item) {
@@ -350,7 +378,7 @@ function salvarPedido() {
     return;
   }
   const now = new Date().toISOString();
-  pedidos.unshift({
+  const novo = {
     id: 'p' + Date.now(),
     fornecedor, item,
     status: 'pedido',
@@ -359,13 +387,12 @@ function salvarPedido() {
     nf: '',
     lancado: false,
     arquivado: false
-  });
-  salvar();
+  };
+  salvarNoFirestore(novo);
   closeModal();
-  render();
 }
 
-function avancarStatus(id) {
+window.avancarStatus = function(id) {
   const p = pedidos.find(x => x.id === id);
   if (!p) return;
   const ordem = ['pedido', 'entregue', 'nf'];
@@ -374,11 +401,10 @@ function avancarStatus(id) {
     p.status = ordem[i + 1];
     p.statusDesde = new Date().toISOString();
   }
-  salvar();
-  render();
+  salvarNoFirestore(p);
 }
 
-function voltarStatus(id) {
+window.voltarStatus = function(id) {
   const p = pedidos.find(x => x.id === id);
   if (!p) return;
   const ordem = ['pedido', 'entregue', 'nf'];
@@ -387,40 +413,35 @@ function voltarStatus(id) {
     p.status = ordem[i - 1];
     p.statusDesde = new Date().toISOString();
   }
-  salvar();
-  render();
+  salvarNoFirestore(p);
 }
 
-function atualizarNF(id, valor) {
+window.atualizarNF = function(id, valor) {
   const p = pedidos.find(x => x.id === id);
   if (!p) return;
   p.nf = valor;
-  salvar();
+  salvarNoFirestore(p);
 }
 
-function toggleLancado(id) {
+window.toggleLancado = function(id) {
   const p = pedidos.find(x => x.id === id);
   if (!p) return;
   p.lancado = !p.lancado;
-  salvar();
-  render();
+  salvarNoFirestore(p);
 }
 
-function arquivar(id) {
+window.arquivar = function(id) {
   const p = pedidos.find(x => x.id === id);
   if (!p) return;
   p.arquivado = true;
-  salvar();
-  render();
+  salvarNoFirestore(p);
 }
 
-function excluir(id) {
-  pedidos = pedidos.filter(x => x.id !== id);
-  salvar();
-  render();
+window.excluir = function(id) {
+  excluirDoFirestore(id);
 }
 
-function setFiltro(f) {
+window.setFiltro = function(f) {
   filtroAtual = f;
   render();
 }
@@ -482,7 +503,7 @@ function render() {
     if (p.status === 'nf') {
       nfRow = `
         <div class="nf-row">
-          <input type="text" placeholder="Numero da NF" value="${p.nf.replace(/"/g,'&quot;')}"
+          <input type="text" placeholder="Numero da NF" value="${(p.nf || '').replace(/"/g,'&quot;')}"
             onchange="atualizarNF('${p.id}', this.value)">
           <button class="toggle-lancado ${p.lancado ? 'on' : ''}" onclick="toggleLancado('${p.id}')">
             ${p.lancado ? 'Lançado no sistema' : 'Pendente lançamento'}
@@ -524,8 +545,6 @@ function render() {
 }
 
 document.getElementById('search').addEventListener('input', render);
-
-carregar();
 </script>
 
 </body>
