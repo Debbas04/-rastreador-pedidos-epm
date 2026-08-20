@@ -383,6 +383,9 @@
 </div>
 
 <div class="filters" id="filters"></div>
+<div style="margin-bottom:14px;">
+  <button class="chip" id="btnAgrupar" onclick="toggleAgrupar()">Agrupar por quarta-feira</button>
+</div>
 
 <div id="list"></div>
 
@@ -469,6 +472,12 @@ let pedidos = [];
 let filtroAtual = 'ativos';
 let editandoId = null;
 let itemCounter = 0;
+let agruparPorData = false;
+
+window.toggleAgrupar = function() {
+  agruparPorData = !agruparPorData;
+  render();
+}
 
 const STATUS = {
   pedido: { label: 'Pedido feito', cls: 'pedido' },
@@ -773,6 +782,164 @@ window.setFiltro = function(f) {
   render();
 }
 
+function renderCard(p) {
+  const hoje = new Date().toISOString().slice(0, 10);
+  const atrasado = estaAtrasado(p);
+  const dias = diasDesde(p.statusDesde);
+  const st = STATUS[p.status];
+  const ordem = ['pedido', 'entregue', 'nf'];
+  const idx = ordem.indexOf(p.status);
+  const podeAvancar = idx < ordem.length - 1 && !p.arquivado;
+  const podeVoltar = idx > 0 && !p.arquivado;
+
+  const itensHTML = (p.itens || []).map(it => `
+    <div class="card-item-line">${it.qtd ? `<span class="qtd">${it.qtd}${it.unidade ? ' ' + it.unidade : ''}</span>` : ''}${it.descricao}</div>
+  `).join('');
+
+  let previsaoHTML = '';
+  if (p.previsao) {
+    const venceu = p.previsao < hoje && p.status !== 'nf';
+    previsaoHTML = `<div class="previsao ${venceu ? 'venceu' : ''}">Previsão: ${formatarData(p.previsao)}${venceu ? ' (vencida)' : ''}</div>`;
+  }
+
+  let infoPagtoHTML = '';
+  const origemLabel = { whatsapp: 'WhatsApp', email: 'E-mail' }[p.origemNota] || '';
+  const pagtoLabel = { boleto: 'Boleto', pix: 'Pix/dados bancários' }[p.pagamento] || '';
+  if (origemLabel || pagtoLabel) {
+    infoPagtoHTML = `<div class="card-meta" style="margin-top:6px;">
+      ${origemLabel ? `<span class="info-pill">Nota: ${origemLabel}</span>` : ''}
+      ${pagtoLabel ? `<span class="info-pill">${pagtoLabel}</span>` : ''}
+    </div>`;
+  }
+
+  let vencimentoAlertaHTML = '';
+  if (p.pagamento === 'boleto' && p.vencimento && !p.lancado) {
+    const boletoVenceu = p.vencimento < hoje;
+    const diasParaVencer = Math.ceil((new Date(p.vencimento) - new Date(hoje)) / 86400000);
+    if (boletoVenceu) {
+      vencimentoAlertaHTML = `<div class="card-meta" style="margin-top:6px;"><span class="badge venc-tag">Boleto vencido em ${formatarData(p.vencimento)}</span></div>`;
+    } else if (diasParaVencer <= 15) {
+      vencimentoAlertaHTML = `<div class="card-meta" style="margin-top:6px;"><span class="badge venc-tag">Vence em ${formatarData(p.vencimento)}</span></div>`;
+    } else {
+      vencimentoAlertaHTML = `<div class="previsao">Boleto vence em ${formatarData(p.vencimento)}</div>`;
+    }
+  }
+
+  let lancamentoHTML = '';
+  if (!p.lancado) {
+    if (p.pagamento === 'boleto' && p.vencimento) {
+      const quartaIdeal = quartaFeiraAnteriorOuIgual(somarDias(p.vencimento, -15));
+      const prazoPerdido = quartaIdeal < hoje;
+      if (prazoPerdido) {
+        lancamentoHTML = `<div class="card-meta" style="margin-top:6px;"><span class="badge venc-tag">Prazo de lançamento vencido (era ${formatarData(quartaIdeal)}) — lance com urgência</span></div>`;
+      } else {
+        lancamentoHTML = `<div class="previsao">Lançar na quarta-feira: ${formatarData(quartaIdeal)}</div>`;
+      }
+    } else if (p.pagamento === 'pix') {
+      const quarta = proximaQuartaFeira();
+      lancamentoHTML = `<div class="previsao">Lançar na quarta-feira: ${formatarData(quarta)}</div>`;
+    }
+  }
+
+  let nfRow = '';
+  if (p.status === 'nf') {
+    nfRow = `
+      <div class="nf-row">
+        <input type="text" placeholder="Número da NF" value="${(p.nf || '').replace(/"/g,'&quot;')}"
+          onchange="atualizarNF('${p.id}', this.value)">
+        <button class="toggle-lancado ${p.lancado ? 'on' : ''}" onclick="toggleLancado('${p.id}')">
+          ${p.lancado ? 'Lançado no sistema' : 'Pendente lançamento'}
+        </button>
+      </div>
+    `;
+  }
+
+  const btnEditar = `<button onclick="openModal('${p.id}')">Editar</button>`;
+  const btnHist = `<button onclick="abrirHistorico('${p.id}')">Histórico</button>`;
+
+  let actions = '';
+  if (!p.arquivado) {
+    actions = `<div class="actions">
+      ${btnEditar}
+      ${btnHist}
+      ${podeVoltar ? `<button onclick="voltarStatus('${p.id}')">Voltar etapa</button>` : ''}
+      ${podeAvancar ? `<button class="primary-ghost" onclick="avancarStatus('${p.id}')">Avançar etapa</button>` : ''}
+      ${p.status === 'nf' ? `<button onclick="arquivar('${p.id}')">Arquivar</button>` : ''}
+      <button class="danger" onclick="excluir('${p.id}')">Excluir</button>
+    </div>`;
+  } else {
+    actions = `<div class="actions">
+      ${btnEditar}
+      ${btnHist}
+      <button class="danger" onclick="excluir('${p.id}')">Excluir</button>
+    </div>`;
+  }
+
+  return `
+    <div class="card ${atrasado ? 'late' : ''}">
+      <div class="card-top">
+        <div>
+          <p class="card-supplier">${p.fornecedor}</p>
+          <div class="card-itens">${itensHTML}</div>
+          ${previsaoHTML}
+          ${infoPagtoHTML}
+          ${vencimentoAlertaHTML}
+          ${lancamentoHTML}
+        </div>
+        <span class="badge ${st.cls}">${st.label}</span>
+      </div>
+      ${nfRow}
+      <div class="card-meta">
+        <span>${dias === 0 ? 'Hoje' : dias + (dias === 1 ? ' dia' : ' dias') + ' nesta etapa'}</span>
+        ${atrasado ? '<span class="badge late-tag">Atrasado</span>' : ''}
+      </div>
+      ${actions}
+    </div>
+  `;
+}
+
+function chaveAgrupamento(p) {
+  if (p.pagamento === 'boleto' && p.vencimento) {
+    return quartaFeiraAnteriorOuIgual(somarDias(p.vencimento, -15));
+  }
+  if (p.pagamento === 'pix') {
+    return proximaQuartaFeira();
+  }
+  return 'sem-dados';
+}
+
+function renderAgrupado(lista) {
+  const pendentes = lista.filter(p => !p.lancado);
+  const grupos = {};
+  pendentes.forEach(p => {
+    const chave = chaveAgrupamento(p);
+    if (!grupos[chave]) grupos[chave] = [];
+    grupos[chave].push(p);
+  });
+
+  const chaves = Object.keys(grupos).filter(k => k !== 'sem-dados').sort();
+  if (grupos['sem-dados']) chaves.push('sem-dados');
+
+  if (chaves.length === 0) {
+    return `<div class="empty">Nenhum pedido pendente de lançamento.</div>`;
+  }
+
+  const hoje = new Date().toISOString().slice(0, 10);
+
+  return chaves.map(chave => {
+    const titulo = chave === 'sem-dados'
+      ? 'Sem forma de pagamento definida'
+      : `Quarta-feira ${formatarData(chave)}${chave < hoje ? ' (prazo vencido)' : ''}`;
+    const corTitulo = (chave !== 'sem-dados' && chave < hoje) ? 'style="color:var(--red-text);"' : '';
+    return `
+      <div style="margin-bottom:18px;">
+        <div ${corTitulo} style="font-size:14px; font-weight:700; margin-bottom:8px;">${titulo} <span class="info-pill">${grupos[chave].length}</span></div>
+        ${grupos[chave].map(p => renderCard(p)).join('')}
+      </div>
+    `;
+  }).join('');
+}
+
 // ===== RENDER =====
 function render() {
   const total = pedidos.filter(p => !p.arquivado).length;
@@ -813,128 +980,21 @@ function render() {
 
   lista = lista.slice().sort((a, b) => new Date(b.criadoEm) - new Date(a.criadoEm));
 
+  document.getElementById('btnAgrupar').classList.toggle('active', agruparPorData);
+
   const listEl = document.getElementById('list');
+
+  if (agruparPorData) {
+    listEl.innerHTML = renderAgrupado(lista);
+    return;
+  }
+
   if (lista.length === 0) {
     listEl.innerHTML = `<div class="empty">Nenhum pedido aqui ainda.</div>`;
     return;
   }
 
-  const hoje = new Date().toISOString().slice(0, 10);
-
-  listEl.innerHTML = lista.map(p => {
-    const atrasado = estaAtrasado(p);
-    const dias = diasDesde(p.statusDesde);
-    const st = STATUS[p.status];
-    const ordem = ['pedido', 'entregue', 'nf'];
-    const idx = ordem.indexOf(p.status);
-    const podeAvancar = idx < ordem.length - 1 && !p.arquivado;
-    const podeVoltar = idx > 0 && !p.arquivado;
-
-    const itensHTML = (p.itens || []).map(it => `
-      <div class="card-item-line">${it.qtd ? `<span class="qtd">${it.qtd}${it.unidade ? ' ' + it.unidade : ''}</span>` : ''}${it.descricao}</div>
-    `).join('');
-
-    let previsaoHTML = '';
-    if (p.previsao) {
-      const venceu = p.previsao < hoje && p.status !== 'nf';
-      previsaoHTML = `<div class="previsao ${venceu ? 'venceu' : ''}">Previsão: ${formatarData(p.previsao)}${venceu ? ' (vencida)' : ''}</div>`;
-    }
-
-    let infoPagtoHTML = '';
-    const origemLabel = { whatsapp: 'WhatsApp', email: 'E-mail' }[p.origemNota] || '';
-    const pagtoLabel = { boleto: 'Boleto', pix: 'Pix/dados bancários' }[p.pagamento] || '';
-    if (origemLabel || pagtoLabel) {
-      infoPagtoHTML = `<div class="card-meta" style="margin-top:6px;">
-        ${origemLabel ? `<span class="info-pill">Nota: ${origemLabel}</span>` : ''}
-        ${pagtoLabel ? `<span class="info-pill">${pagtoLabel}</span>` : ''}
-      </div>`;
-    }
-
-    let vencimentoAlertaHTML = '';
-    if (p.pagamento === 'boleto' && p.vencimento && !p.lancado) {
-      const boletoVenceu = p.vencimento < hoje;
-      const diasParaVencer = Math.ceil((new Date(p.vencimento) - new Date(hoje)) / 86400000);
-      if (boletoVenceu) {
-        vencimentoAlertaHTML = `<div class="card-meta" style="margin-top:6px;"><span class="badge venc-tag">Boleto vencido em ${formatarData(p.vencimento)}</span></div>`;
-      } else if (diasParaVencer <= 15) {
-        vencimentoAlertaHTML = `<div class="card-meta" style="margin-top:6px;"><span class="badge venc-tag">Vence em ${formatarData(p.vencimento)}</span></div>`;
-      } else {
-        vencimentoAlertaHTML = `<div class="previsao">Boleto vence em ${formatarData(p.vencimento)}</div>`;
-      }
-    }
-
-    let lancamentoHTML = '';
-    if (!p.lancado) {
-      if (p.pagamento === 'boleto' && p.vencimento) {
-        const quartaIdeal = quartaFeiraAnteriorOuIgual(somarDias(p.vencimento, -15));
-        const prazoPerdido = quartaIdeal < hoje;
-        if (prazoPerdido) {
-          lancamentoHTML = `<div class="card-meta" style="margin-top:6px;"><span class="badge venc-tag">Prazo de lançamento vencido (era ${formatarData(quartaIdeal)}) — lance com urgência</span></div>`;
-        } else {
-          lancamentoHTML = `<div class="previsao">Lançar na quarta-feira: ${formatarData(quartaIdeal)}</div>`;
-        }
-      } else if (p.pagamento === 'pix') {
-        const quarta = proximaQuartaFeira();
-        lancamentoHTML = `<div class="previsao">Lançar na quarta-feira: ${formatarData(quarta)}</div>`;
-      }
-    }
-
-    let nfRow = '';
-    if (p.status === 'nf') {
-      nfRow = `
-        <div class="nf-row">
-          <input type="text" placeholder="Número da NF" value="${(p.nf || '').replace(/"/g,'&quot;')}"
-            onchange="atualizarNF('${p.id}', this.value)">
-          <button class="toggle-lancado ${p.lancado ? 'on' : ''}" onclick="toggleLancado('${p.id}')">
-            ${p.lancado ? 'Lançado no sistema' : 'Pendente lançamento'}
-          </button>
-        </div>
-      `;
-    }
-
-    const btnEditar = `<button onclick="openModal('${p.id}')">Editar</button>`;
-    const btnHist = `<button onclick="abrirHistorico('${p.id}')">Histórico</button>`;
-
-    let actions = '';
-    if (!p.arquivado) {
-      actions = `<div class="actions">
-        ${btnEditar}
-        ${btnHist}
-        ${podeVoltar ? `<button onclick="voltarStatus('${p.id}')">Voltar etapa</button>` : ''}
-        ${podeAvancar ? `<button class="primary-ghost" onclick="avancarStatus('${p.id}')">Avançar etapa</button>` : ''}
-        ${p.status === 'nf' ? `<button onclick="arquivar('${p.id}')">Arquivar</button>` : ''}
-        <button class="danger" onclick="excluir('${p.id}')">Excluir</button>
-      </div>`;
-    } else {
-      actions = `<div class="actions">
-        ${btnEditar}
-        ${btnHist}
-        <button class="danger" onclick="excluir('${p.id}')">Excluir</button>
-      </div>`;
-    }
-
-    return `
-      <div class="card ${atrasado ? 'late' : ''}">
-        <div class="card-top">
-          <div>
-            <p class="card-supplier">${p.fornecedor}</p>
-            <div class="card-itens">${itensHTML}</div>
-            ${previsaoHTML}
-            ${infoPagtoHTML}
-            ${vencimentoAlertaHTML}
-            ${lancamentoHTML}
-          </div>
-          <span class="badge ${st.cls}">${st.label}</span>
-        </div>
-        ${nfRow}
-        <div class="card-meta">
-          <span>${dias === 0 ? 'Hoje' : dias + (dias === 1 ? ' dia' : ' dias') + ' nesta etapa'}</span>
-          ${atrasado ? '<span class="badge late-tag">Atrasado</span>' : ''}
-        </div>
-        ${actions}
-      </div>
-    `;
-  }).join('');
+  listEl.innerHTML = lista.map(p => renderCard(p)).join('');
 }
 
 document.getElementById('search').addEventListener('input', render);
