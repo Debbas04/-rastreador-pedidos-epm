@@ -324,6 +324,39 @@
 
   .err { color: var(--red-text); font-size: 12px; margin-top: 4px; display: none; }
 
+  .seg-control {
+    display: flex;
+    gap: 6px;
+  }
+  .seg-btn {
+    flex: 1;
+    padding: 9px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .seg-btn.on {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+
+  .venc-tag {
+    background: var(--red-bg); color: var(--red-text);
+    border: 1px solid var(--red-border);
+  }
+  .info-pill {
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+
   .hist-list { margin-top: 6px; }
   .hist-line {
     font-size: 13px;
@@ -370,6 +403,27 @@
     <div class="field">
       <label>Previsão de entrega (opcional)</label>
       <input type="date" id="f-previsao">
+    </div>
+
+    <div class="field">
+      <label>Onde está a nota fiscal</label>
+      <div class="seg-control" id="segOrigem">
+        <button type="button" class="seg-btn" data-valor="whatsapp" onclick="selecionarOrigem('whatsapp')">WhatsApp</button>
+        <button type="button" class="seg-btn" data-valor="email" onclick="selecionarOrigem('email')">E-mail</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Forma de pagamento</label>
+      <div class="seg-control" id="segPagamento">
+        <button type="button" class="seg-btn" data-valor="boleto" onclick="selecionarPagamento('boleto')">Boleto</button>
+        <button type="button" class="seg-btn" data-valor="pix" onclick="selecionarPagamento('pix')">Pix / dados bancários</button>
+      </div>
+    </div>
+
+    <div class="field" id="campoVencimento" style="display:none;">
+      <label>Vencimento do boleto</label>
+      <input type="date" id="f-vencimento">
     </div>
 
     <div class="err" id="f-err">Preencha fornecedor e pelo menos um item.</div>
@@ -454,6 +508,10 @@ function diasDesde(iso) {
 
 function estaAtrasado(p) {
   if (p.arquivado) return false;
+  if (p.pagamento === 'boleto' && p.vencimento && !p.lancado) {
+    const hoje = new Date().toISOString().slice(0, 10);
+    if (p.vencimento < hoje) return true;
+  }
   return diasDesde(p.statusDesde) >= 3;
 }
 
@@ -506,6 +564,24 @@ function lerItensDoModal() {
   return itens;
 }
 
+let origemSelecionada = '';
+let pagamentoSelecionado = '';
+
+window.selecionarOrigem = function(valor) {
+  origemSelecionada = origemSelecionada === valor ? '' : valor;
+  document.querySelectorAll('#segOrigem .seg-btn').forEach(b => {
+    b.classList.toggle('on', b.dataset.valor === origemSelecionada);
+  });
+}
+
+window.selecionarPagamento = function(valor) {
+  pagamentoSelecionado = pagamentoSelecionado === valor ? '' : valor;
+  document.querySelectorAll('#segPagamento .seg-btn').forEach(b => {
+    b.classList.toggle('on', b.dataset.valor === pagamentoSelecionado);
+  });
+  document.getElementById('campoVencimento').style.display = pagamentoSelecionado === 'boleto' ? 'block' : 'none';
+}
+
 // ===== MODAL PRINCIPAL =====
 window.openModal = function(id) {
   editandoId = id || null;
@@ -524,6 +600,17 @@ window.openModal = function(id) {
     adicionarLinhaItem();
   }
 
+  origemSelecionada = p ? (p.origemNota || '') : '';
+  pagamentoSelecionado = p ? (p.pagamento || '') : '';
+  document.querySelectorAll('#segOrigem .seg-btn').forEach(b => {
+    b.classList.toggle('on', b.dataset.valor === origemSelecionada);
+  });
+  document.querySelectorAll('#segPagamento .seg-btn').forEach(b => {
+    b.classList.toggle('on', b.dataset.valor === pagamentoSelecionado);
+  });
+  document.getElementById('f-vencimento').value = p ? (p.vencimento || '') : '';
+  document.getElementById('campoVencimento').style.display = pagamentoSelecionado === 'boleto' ? 'block' : 'none';
+
   document.getElementById('modalOverlay').classList.add('open');
 }
 window.closeModal = function() {
@@ -534,6 +621,7 @@ window.closeModal = function() {
 window.salvarPedido = function() {
   const fornecedor = document.getElementById('f-fornecedor').value.trim();
   const previsao = document.getElementById('f-previsao').value;
+  const vencimento = pagamentoSelecionado === 'boleto' ? document.getElementById('f-vencimento').value : '';
   const itens = lerItensDoModal();
 
   if (!fornecedor || itens.length === 0) {
@@ -547,6 +635,9 @@ window.salvarPedido = function() {
       p.fornecedor = fornecedor;
       p.itens = itens;
       p.previsao = previsao;
+      p.origemNota = origemSelecionada;
+      p.pagamento = pagamentoSelecionado;
+      p.vencimento = vencimento;
       salvarNoFirestore(p);
     }
   } else {
@@ -556,6 +647,9 @@ window.salvarPedido = function() {
       fornecedor,
       itens,
       previsao,
+      origemNota: origemSelecionada,
+      pagamento: pagamentoSelecionado,
+      vencimento,
       status: 'pedido',
       statusDesde: now,
       criadoEm: now,
@@ -715,6 +809,29 @@ function render() {
       previsaoHTML = `<div class="previsao ${venceu ? 'venceu' : ''}">Previsão: ${formatarData(p.previsao)}${venceu ? ' (vencida)' : ''}</div>`;
     }
 
+    let infoPagtoHTML = '';
+    const origemLabel = { whatsapp: 'WhatsApp', email: 'E-mail' }[p.origemNota] || '';
+    const pagtoLabel = { boleto: 'Boleto', pix: 'Pix/dados bancários' }[p.pagamento] || '';
+    if (origemLabel || pagtoLabel) {
+      infoPagtoHTML = `<div class="card-meta" style="margin-top:6px;">
+        ${origemLabel ? `<span class="info-pill">Nota: ${origemLabel}</span>` : ''}
+        ${pagtoLabel ? `<span class="info-pill">${pagtoLabel}</span>` : ''}
+      </div>`;
+    }
+
+    let vencimentoAlertaHTML = '';
+    if (p.pagamento === 'boleto' && p.vencimento && !p.lancado) {
+      const boletoVenceu = p.vencimento < hoje;
+      const diasParaVencer = Math.ceil((new Date(p.vencimento) - new Date(hoje)) / 86400000);
+      if (boletoVenceu) {
+        vencimentoAlertaHTML = `<div class="card-meta" style="margin-top:6px;"><span class="badge venc-tag">Boleto vencido em ${formatarData(p.vencimento)}</span></div>`;
+      } else if (diasParaVencer <= 15) {
+        vencimentoAlertaHTML = `<div class="card-meta" style="margin-top:6px;"><span class="badge venc-tag">Vence em ${formatarData(p.vencimento)}</span></div>`;
+      } else {
+        vencimentoAlertaHTML = `<div class="previsao">Boleto vence em ${formatarData(p.vencimento)}</div>`;
+      }
+    }
+
     let nfRow = '';
     if (p.status === 'nf') {
       nfRow = `
@@ -756,6 +873,8 @@ function render() {
             <p class="card-supplier">${p.fornecedor}</p>
             <div class="card-itens">${itensHTML}</div>
             ${previsaoHTML}
+            ${infoPagtoHTML}
+            ${vencimentoAlertaHTML}
           </div>
           <span class="badge ${st.cls}">${st.label}</span>
         </div>
