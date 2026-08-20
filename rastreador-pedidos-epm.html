@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rastreador de Pedidos - EPM</title>
+<style>
+  :root {
+    --bg: #f5f4f0;
+    --card: #ffffff;
+    --border: #ddd9cf;
+    --text: #2c2b28;
+    --text-muted: #8a877d;
+    --amber-bg: #fdf1de;
+    --amber-text: #8a5a0c;
+    --amber-border: #f0c98a;
+    --blue-bg: #e6f1fb;
+    --blue-text: #0c447c;
+    --blue-border: #a9cdf0;
+    --green-bg: #eaf3de;
+    --green-text: #27500a;
+    --green-border: #b7d98a;
+    --red-bg: #fcebeb;
+    --red-text: #791f1f;
+    --red-border: #eeb4b4;
+    --accent: #b5602e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 16px;
+    max-width: 720px;
+    margin: 0 auto;
+    padding-bottom: 80px;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 8px 0 4px;
+  }
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .stat {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 6px;
+    text-align: center;
+  }
+  .stat .num { font-size: 18px; font-weight: 700; }
+  .stat .lbl { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+  .stat.alert .num { color: var(--red-text); }
+
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .toolbar input[type=text] {
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 14px;
+    background: var(--card);
+  }
+  button {
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .btn-primary:active { opacity: 0.85; }
+
+  .filters {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+  .chip {
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .chip.active {
+    background: var(--text);
+    color: white;
+    border-color: var(--text);
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+  .card.late { border-color: var(--red-border); background: var(--red-bg); }
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .card-item { font-size: 15px; font-weight: 600; margin: 0 0 2px; }
+  .card-supplier { font-size: 13px; color: var(--text-muted); margin: 0; }
+  .badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .badge.pedido { background: var(--amber-bg); color: var(--amber-text); }
+  .badge.entregue { background: var(--blue-bg); color: var(--blue-text); }
+  .badge.nf { background: var(--green-bg); color: var(--green-text); }
+  .badge.late-tag {
+    background: var(--red-bg); color: var(--red-text);
+    border: 1px solid var(--red-border);
+  }
+
+  .card-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 8px;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .nf-row {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .nf-row input[type=text] {
+    flex: 1;
+    min-width: 110px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .toggle-lancado {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text-muted);
+  }
+  .toggle-lancado.on {
+    background: var(--green-bg);
+    color: var(--green-text);
+    border-color: var(--green-border);
+  }
+
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .actions button {
+    font-size: 12px;
+    padding: 7px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+  }
+  .actions button.danger { color: var(--red-text); border-color: var(--red-border); }
+
+  .empty {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 40px 20px;
+    font-size: 14px;
+  }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 50;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--card);
+    width: 100%;
+    max-width: 480px;
+    border-radius: 16px 16px 0 0;
+    padding: 20px;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  .modal h2 { font-size: 16px; margin: 0 0 14px; }
+  .field { margin-bottom: 12px; }
+  .field label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+  .field input, .field textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .modal-actions button { flex: 1; padding: 12px; border-radius: 8px; font-size: 14px; font-weight: 600; }
+  .btn-cancel { background: #fff; border: 1px solid var(--border); color: var(--text); }
+
+  .err { color: var(--red-text); font-size: 12px; margin-top: 4px; display: none; }
+</style>
+</head>
+<body>
+
+<h1>Rastreador de pedidos - EPM</h1>
+<p class="subtitle">Pedido &rarr; Entregue &rarr; NF recebida</p>
+
+<div class="stats" id="stats"></div>
+
+<div class="toolbar">
+  <input type="text" id="search" placeholder="Buscar fornecedor ou item">
+  <button class="btn-primary" onclick="openModal()">+ Novo</button>
+</div>
+
+<div class="filters" id="filters"></div>
+
+<div id="list"></div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>Novo pedido</h2>
+    <div class="field">
+      <label>Fornecedor</label>
+      <input type="text" id="f-fornecedor" placeholder="Ex: Fornecedor A">
+    </div>
+    <div class="field">
+      <label>Item / descrição do pedido</label>
+      <input type="text" id="f-item" placeholder="Ex: 50 sacos de cimento">
+    </div>
+    <div class="err" id="f-err">Preencha fornecedor e item.</div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary" onclick="salvarPedido()" style="flex:1;">Salvar pedido</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let pedidos = [];
+let filtroAtual = 'ativos';
+let buscaAtual = '';
+
+const STATUS = {
+  pedido: { label: 'Pedido feito', cls: 'pedido' },
+  entregue: { label: 'Entregue', cls: 'entregue' },
+  nf: { label: 'NF recebida', cls: 'nf' }
+};
+
+function carregar() {
+  try {
+    const raw = localStorage.getItem('pedidos-epm');
+    pedidos = raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    pedidos = [];
+  }
+  render();
+}
+
+function salvar() {
+  try {
+    localStorage.setItem('pedidos-epm', JSON.stringify(pedidos));
+  } catch (e) {
+    console.error('Erro ao salvar', e);
+  }
+}
+
+function diasDesde(iso) {
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  return d;
+}
+
+function estaAtrasado(p) {
+  if (p.arquivado) return false;
+  return diasDesde(p.statusDesde) >= 3;
+}
+
+function openModal() {
+  document.getElementById('f-fornecedor').value = '';
+  document.getElementById('f-item').value = '';
+  document.getElementById('f-err').style.display = 'none';
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+function salvarPedido() {
+  const fornecedor = document.getElementById('f-fornecedor').value.trim();
+  const item = document.getElementById('f-item').value.trim();
+  if (!fornecedor || !item) {
+    document.getElementById('f-err').style.display = 'block';
+    return;
+  }
+  const now = new Date().toISOString();
+  pedidos.unshift({
+    id: 'p' + Date.now(),
+    fornecedor, item,
+    status: 'pedido',
+    statusDesde: now,
+    criadoEm: now,
+    nf: '',
+    lancado: false,
+    arquivado: false
+  });
+  salvar();
+  closeModal();
+  render();
+}
+
+function avancarStatus(id) {
+  const p = pedidos.find(x => x.id === id);
+  if (!p) return;
+  const ordem = ['pedido', 'entregue', 'nf'];
+  const i = ordem.indexOf(p.status);
+  if (i < ordem.length - 1) {
+    p.status = ordem[i + 1];
+    p.statusDesde = new Date().toISOString();
+  }
+  salvar();
+  render();
+}
+
+function voltarStatus(id) {
+  const p = pedidos.find(x => x.id === id);
+  if (!p) return;
+  const ordem = ['pedido', 'entregue', 'nf'];
+  const i = ordem.indexOf(p.status);
+  if (i > 0) {
+    p.status = ordem[i - 1];
+    p.statusDesde = new Date().toISOString();
+  }
+  salvar();
+  render();
+}
+
+function atualizarNF(id, valor) {
+  const p = pedidos.find(x => x.id === id);
+  if (!p) return;
+  p.nf = valor;
+  salvar();
+}
+
+function toggleLancado(id) {
+  const p = pedidos.find(x => x.id === id);
+  if (!p) return;
+  p.lancado = !p.lancado;
+  salvar();
+  render();
+}
+
+function arquivar(id) {
+  const p = pedidos.find(x => x.id === id);
+  if (!p) return;
+  p.arquivado = true;
+  salvar();
+  render();
+}
+
+function excluir(id) {
+  pedidos = pedidos.filter(x => x.id !== id);
+  salvar();
+  render();
+}
+
+function setFiltro(f) {
+  filtroAtual = f;
+  render();
+}
+
+function render() {
+  const total = pedidos.filter(p => !p.arquivado).length;
+  const atrasados = pedidos.filter(p => estaAtrasado(p)).length;
+  const nf = pedidos.filter(p => p.status === 'nf' && !p.arquivado).length;
+  const emAndamento = pedidos.filter(p => p.status !== 'nf' && !p.arquivado).length;
+
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="num">${total}</div><div class="lbl">total</div></div>
+    <div class="stat"><div class="num">${emAndamento}</div><div class="lbl">em andamento</div></div>
+    <div class="stat"><div class="num">${nf}</div><div class="lbl">concluidos</div></div>
+    <div class="stat ${atrasados > 0 ? 'alert' : ''}"><div class="num">${atrasados}</div><div class="lbl">atrasados</div></div>
+  `;
+
+  const filtros = [
+    { id: 'ativos', label: 'Ativos' },
+    { id: 'pedido', label: 'Pedido feito' },
+    { id: 'entregue', label: 'Entregue' },
+    { id: 'nf', label: 'NF recebida' },
+    { id: 'arquivados', label: 'Arquivados' }
+  ];
+  document.getElementById('filters').innerHTML = filtros.map(f =>
+    `<button class="chip ${filtroAtual === f.id ? 'active' : ''}" onclick="setFiltro('${f.id}')">${f.label}</button>`
+  ).join('');
+
+  let lista = pedidos;
+  if (filtroAtual === 'ativos') lista = lista.filter(p => !p.arquivado);
+  else if (filtroAtual === 'arquivados') lista = lista.filter(p => p.arquivado);
+  else lista = lista.filter(p => p.status === filtroAtual && !p.arquivado);
+
+  const busca = document.getElementById('search').value.trim().toLowerCase();
+  if (busca) {
+    lista = lista.filter(p =>
+      p.fornecedor.toLowerCase().includes(busca) || p.item.toLowerCase().includes(busca)
+    );
+  }
+
+  lista = lista.slice().sort((a, b) => new Date(b.criadoEm) - new Date(a.criadoEm));
+
+  const listEl = document.getElementById('list');
+  if (lista.length === 0) {
+    listEl.innerHTML = `<div class="empty">Nenhum pedido aqui ainda.</div>`;
+    return;
+  }
+
+  listEl.innerHTML = lista.map(p => {
+    const atrasado = estaAtrasado(p);
+    const dias = diasDesde(p.statusDesde);
+    const st = STATUS[p.status];
+    const ordem = ['pedido', 'entregue', 'nf'];
+    const idx = ordem.indexOf(p.status);
+    const podeAvancar = idx < ordem.length - 1 && !p.arquivado;
+    const podeVoltar = idx > 0 && !p.arquivado;
+
+    let nfRow = '';
+    if (p.status === 'nf') {
+      nfRow = `
+        <div class="nf-row">
+          <input type="text" placeholder="Numero da NF" value="${p.nf.replace(/"/g,'&quot;')}"
+            onchange="atualizarNF('${p.id}', this.value)">
+          <button class="toggle-lancado ${p.lancado ? 'on' : ''}" onclick="toggleLancado('${p.id}')">
+            ${p.lancado ? 'Lançado no sistema' : 'Pendente lançamento'}
+          </button>
+        </div>
+      `;
+    }
+
+    let actions = '';
+    if (!p.arquivado) {
+      actions = `<div class="actions">
+        ${podeVoltar ? `<button onclick="voltarStatus('${p.id}')">Voltar etapa</button>` : ''}
+        ${podeAvancar ? `<button onclick="avancarStatus('${p.id}')">Avançar etapa</button>` : ''}
+        ${p.status === 'nf' ? `<button onclick="arquivar('${p.id}')">Arquivar</button>` : ''}
+        <button class="danger" onclick="excluir('${p.id}')">Excluir</button>
+      </div>`;
+    } else {
+      actions = `<div class="actions"><button class="danger" onclick="excluir('${p.id}')">Excluir</button></div>`;
+    }
+
+    return `
+      <div class="card ${atrasado ? 'late' : ''}">
+        <div class="card-top">
+          <div>
+            <p class="card-item">${p.item}</p>
+            <p class="card-supplier">${p.fornecedor}</p>
+          </div>
+          <span class="badge ${st.cls}">${st.label}</span>
+        </div>
+        ${nfRow}
+        <div class="card-meta">
+          <span>${dias === 0 ? 'Hoje' : dias + (dias === 1 ? ' dia' : ' dias') + ' nesta etapa'}</span>
+          ${atrasado ? '<span class="badge late-tag">Atrasado</span>' : ''}
+        </div>
+        ${actions}
+      </div>
+    `;
+  }).join('');
+}
+
+document.getElementById('search').addEventListener('input', render);
+
+carregar();
+</script>
+
+</body>
+</html>
